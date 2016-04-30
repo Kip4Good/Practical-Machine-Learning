@@ -1,0 +1,105 @@
+---
+title: "Weight Lifting Exercise Analysis"
+output: html_document
+---
+
+###Synopsis
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. The main objective of this project is to predict the manner in which they did the exercise. This is the 'classe' variable in the training set. 
+
+###Data
+Six participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Bicep Curl in these 5 different fashions:
+
+* Class A: Exactly according to specification
+* Class B: Throwing the elbows to the front
+* Class C: Lifting the dumbbell only halfway
+* Class D: Lowering the dumbbell only halfway
+* Class E: Throwing the hips to the front 
+
+###Libraries Needed
+First, we need to load the necessary libraries that we will be using for the project. 
+```{r}
+library(caret)
+library(knitr)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+```
+
+###Processing the Data
+First we need to set the seed so we will be able to reproduce the same results
+```{r}
+set.seed(9999)
+```
+
+NA will need to be removed from the dataset.
+```{r}
+training <- read.csv("pml-training.csv", na.strings=c("NA","DIV/0!", ""))
+testing <- read.csv("pml-testing.csv", na.strings=c("NA","DIV/0!", ""))
+training <- training[,colSums(is.na(training)) == 0]
+testing <- testing[,colSums(is.na(testing)) == 0]
+```
+
+Columns with data that we won't use will be removed
+```{r}
+training <- training[,-c(1:7)]
+testing <- testing[,-c(1:7)]
+```
+
+###Cross Validation
+We will split the training data for cross validation into a samples of 75% for training and 25% for testing 
+```{r}
+samples <- createDataPartition(y=training$classe, p=0.75, list=FALSE)
+trainingSamples <- training[samples, ]
+testingSamples <- training[-samples, ]
+```
+
+###Exploratory Data Analysis
+This plot will show the frequency of each of the five classe levels in the training sample data. The most frequent is Level A and the lest frequent is Level D.
+```{r}
+plot(trainingSamples$classe, col="red", main="Variable Classe Levels", xlab="Classe Levels", ylab="Frequency")
+```
+
+###Model Building
+We will be building a decision tree model, as well as a random forest model.
+
+#####Decision Tree
+```{r}
+modelTree <- rpart(classe ~., data=trainingSamples, method="class")
+predictionTree <- predict(modelTree, testingSamples, type="class")
+rpart.plot(modelTree, main="Classification Tree", extra=102, under=TRUE, faclen=0)
+```
+
+Confusion matrix shows the prediction errors.
+```{r}
+confusionMatrix(predictionTree, testingSamples$classe)
+```
+
+#####Random Forest
+```{r}
+modelForest <- randomForest(classe ~., data=trainingSamples, method="class")
+predictionForest <- predict(modelForest, testingSamples, type="class")
+```
+
+Confusion matrix shows the prediction errors.
+```{r}
+confusionMatrix(predictionForest, testingSamples$classe)
+```
+
+###Conclusion
+Our findings show that the random forest model performs better than the decision tree model. The random forest model had an accuracy of 0.995 (95% CI: (0.993, 0.997)). While, the decision tree model had an accuracy of 0.739 (95% CI: (0.727, 0.752)). The expected out of sample error is estimated at 0.5%. With an accuracy above 99% on our cross validation data, we can expect that missclassification with be few or none at all.
+
+###Submission
+```{r}
+answers <- predict(modelForest, testing, type="class")
+answers
+
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("./Prediction_Assignment_Writeup_files",i,".txt")
+    write.table(x[i], file = filename, quote = FALSE, row.names = FALSE, col.names = FALSE)
+  }
+}
+
+pml_write_files(answers)
+```
